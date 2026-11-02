@@ -109,11 +109,24 @@
       if (ok) resolve(); else reject(new Error('copy failed'));
     });
   }
+  // 標準の方法が応答しないまま止まる場合に備え、1.5秒で古い方法に切り替える
   function copyToClipboard(text) {
+    var viaApi;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text); });
+      viaApi = new Promise(function (resolve, reject) {
+        var timer = setTimeout(function () { reject(new Error('timeout')); }, 1500);
+        navigator.clipboard.writeText(text).then(function () {
+          clearTimeout(timer);
+          resolve();
+        }, function (e) {
+          clearTimeout(timer);
+          reject(e);
+        });
+      });
+    } else {
+      viaApi = Promise.reject(new Error('no clipboard api'));
     }
-    return fallbackCopy(text);
+    return viaApi.catch(function () { return fallbackCopy(text); });
   }
   function copyWithToast(text, label) {
     copyToClipboard(text).then(function () {
