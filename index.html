@@ -2,17 +2,237 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>SW2.5消耗品カウンター（ゆとシート対応・非公式）</title>
-<style>
-  body { margin: 0; padding: 2rem 1rem; font-family: sans-serif; background: #f4f4f4; color: #333; text-align: center; }
-  h1 { font-size: 1.4rem; margin-bottom: .2rem; }
-  p { margin: .4rem 0; }
-</style>
+<meta name="description" content="ソード・ワールド2.5のゆとシートから消耗品を読み込み、セッション中の個数管理と補充金額の計算ができる非公式ツールです。">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<h1>SW2.5消耗品カウンター</h1>
-<p>ゆとシート対応（非公式）</p>
-<p>ただいま準備中です。</p>
+
+<header class="site-head">
+  <div class="site-head-inner">
+    <h1>SW2.5消耗品カウンター</h1>
+    <p class="sub">ゆとシート対応（非公式）</p>
+    <p id="charName" class="char" hidden></p>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" aria-label="画面の切り替え">
+  <div class="tabs-inner">
+    <button type="button" data-tab="main" aria-selected="true">消耗品</button>
+    <button type="button" data-tab="settle" aria-selected="false">精算</button>
+    <button type="button" data-tab="help" aria-selected="false">使い方</button>
+    <button type="button" data-tab="settings" aria-selected="false">設定</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- 消耗品 -->
+  <section id="tab-main" class="tab">
+    <div id="listView"></div>
+
+    <div id="mainTools" hidden>
+      <details class="box tool" id="addCardBox">
+        <summary>マテリアルカードを追加（入手したとき）</summary>
+        <form id="addCardForm" class="form">
+          <div class="form-row">
+            <label>色
+              <select id="cardColor">
+                <option value="Red">赤</option>
+                <option value="Gre">緑</option>
+                <option value="Bla">黒</option>
+                <option value="Whi">白</option>
+                <option value="Gol">金</option>
+              </select>
+            </label>
+            <label>ランク
+              <select id="cardRank">
+                <option value="B">B</option>
+                <option value="A">A</option>
+                <option value="S">S</option>
+                <option value="SS">SS</option>
+              </select>
+            </label>
+            <label>枚数
+              <input id="cardCount" type="number" inputmode="numeric" min="1" max="9999" value="1">
+            </label>
+          </div>
+          <p class="form-error" id="addCardError" role="alert"></p>
+          <button type="submit" class="primary">追加する</button>
+        </form>
+      </details>
+
+      <details class="box tool" id="addItemBox">
+        <summary>アイテムを追加（シートに無い物を入手したとき）</summary>
+        <form id="addItemForm" class="form">
+          <label>名称
+            <input id="itemName" type="text" autocomplete="off" placeholder="例: 魔晶石（５）">
+          </label>
+          <label>効果（コピーする文章になります）
+            <input id="itemEffect" type="text" autocomplete="off" placeholder="例: ＭＰを５点代用できる">
+          </label>
+          <div class="form-row">
+            <label>個数
+              <input id="itemCount" type="number" inputmode="numeric" min="0" max="9999" value="1">
+            </label>
+            <label>単価（G）
+              <input id="itemPrice" type="number" inputmode="numeric" min="0" value="0">
+            </label>
+          </div>
+          <p class="form-error" id="addItemError" role="alert"></p>
+          <button type="submit" class="primary">追加する</button>
+        </form>
+      </details>
+
+      <details class="box tool" id="logBox">
+        <summary>操作ログ（<span id="logCount">0</span>件）</summary>
+        <p class="note">ボタンを押した記録です。「押し間違えたかも」と思ったときに見てください。直したいときは「−」「＋」で戻せます。</p>
+        <ol id="logList" class="log"></ol>
+      </details>
+    </div>
+  </section>
+
+  <!-- 精算 -->
+  <section id="tab-settle" class="tab" hidden>
+    <div id="settleView"></div>
+  </section>
+
+  <!-- 使い方 -->
+  <section id="tab-help" class="tab" hidden>
+    <article class="box help">
+      <h2>このツールでできること</h2>
+      <p>セッション中に使った薬や魔晶石などの数を、ボタンで減らして記録します。セッションが終わったら、買い足すのにいくらかかるかが分かります。</p>
+      <p>ゆとシートの内容は変わりません（見るだけです）。</p>
+
+      <h2>はじめに（最初の1回だけ）</h2>
+      <ol>
+        <li>「設定」を開きます。</li>
+        <li>ゆとシートのページのアドレス（URL）を、入力欄に貼り付けます。</li>
+        <li>「読み込む」を押します。キャラクターの名前が出れば成功です。</li>
+      </ol>
+      <p>次回からは、開くだけで前回の続きから使えます。</p>
+
+      <h2>セッション中の使い方</h2>
+      <ul>
+        <li><strong>「−」ボタン</strong>: 使ったら押します。数が1つ減ります。</li>
+        <li><strong>「＋」ボタン</strong>: 拾ったときや、間違えて減らしたときに押します。</li>
+        <li><strong>大きな数字をタップ</strong>: 数をまとめて直したいときは、数字を直接入力できます。</li>
+        <li><strong>「コピー」ボタン</strong>: 「【魔晶石（５）】ＭＰを５点代用できる」のような文章がコピーされます。チャットに貼って、使うと宣言できます。数は減りません。</li>
+        <li><strong>見出しをタップ</strong>: 同じ種類のアイテムを、たたんだり開いたりできます。</li>
+        <li><strong>「操作ログ」</strong>: いつ何を押したかが残っています。「あれ、押したかな？」と思ったときに見てください。間違えていたら「−」「＋」で直せます。</li>
+      </ul>
+      <p>赤い「−2」のような表示は、シートの数より2つ減っているという意味です。緑の「+1」は、シートの数より1つ増えているという意味です。</p>
+
+      <h2>拾ったとき</h2>
+      <ul>
+        <li>すでに持っている物は、「＋」を押します。</li>
+        <li>持っていなかった物は、「アイテムを追加」から名前などを入れます。</li>
+        <li>マテリアルカードは、「マテリアルカードを追加」から色とランクを選びます。</li>
+      </ul>
+
+      <h2>セッションが終わったら</h2>
+      <ol>
+        <li>「精算」を開きます。</li>
+        <li>減った物が一覧で出ます。買い足す物にチェックを入れます（最初は全部チェック済みです）。</li>
+        <li>チェックした物の合計金額が出ます。報酬や所持金から引いてください。</li>
+        <li>「シートに書き込む個数」に出ている物は、ゆとシートの個数を書き換えてください。
+          <ul>
+            <li>買い足さなかった物は、減った後の数に直します。</li>
+            <li>拾った物は、増やした数にします。</li>
+          </ul>
+        </li>
+        <li>買い足した物は、シートの個数が元のままなので、直さなくて大丈夫です。</li>
+      </ol>
+
+      <h2>ゆとシートへの書き方</h2>
+      <p>ゆとシートの編集画面の「アイテム」欄に、次のように書くと、このツールが読み取ります。</p>
+      <pre class="sample">**石類[消耗品]
+|~名称|~個数|~効果|~単価|
+|魔晶石（５）|3|ＭＰを５点代用できる|500G|
+|魔晶石（３）|2|ＭＰを３点代用できる|300G|</pre>
+      <ul>
+        <li>見出しの最後に <strong>[消耗品]</strong> と付けた表だけが、このツールに表示されます。</li>
+        <li>1行目は「**」で始めて、種類の名前と [消耗品] を書きます。</li>
+        <li>表の1行目（「名称」「個数」…）は、そのまま書いてください。順番は入れ替えてもかまいません。</li>
+        <li>「名称」と「個数」は必ず書いてください。「効果」と「単価」はなくても動きますが、「単価」がない場合は金額が0Gになります。</li>
+        <li>全角でも半角でも、前後に空白があっても大丈夫です。</li>
+        <li>[消耗品] と付けていない表（冒険道具など）は、読み取られません。</li>
+        <li>同じ名前のアイテムが2つ以上あると、読み込めません。書き間違いの可能性があるので、シートを直してからもう一度読み込んでください。</li>
+        <li>マテリアルカードは、ゆとシートの「マテリアルカード」欄に枚数を入れておけば、自動で読み取ります。金額はランクで決まっています（B=20G、A=200G、S=2000G、SS=20000G）。</li>
+      </ul>
+      <p>読み込んだ後に「読み取れた内容」が出るので、数が合っているか見てください。読み取れなかった行は、注意の表示が出ます。</p>
+
+      <h2>うまくいかないとき</h2>
+      <ul>
+        <li><strong>読み込めない</strong>: ゆとシートが公開になっているか、アドレスが正しいか確認してください。</li>
+        <li><strong>アイテムが出てこない</strong>: 見出しに [消耗品] が付いているか確認してください。</li>
+        <li><strong>画面を閉じてしまった</strong>: そのまま開き直せば、続きから使えます。</li>
+        <li><strong>別の端末で使いたい</strong>: 「設定」の「保存する」でファイルを作り、別の端末で「読み込む」を使ってください。</li>
+        <li><strong>最初からやり直したい</strong>: 「設定」でもう一度「読み込む」を押し、確認で「はい」を選んでください。</li>
+        <li><strong>記録について</strong>: 数の記録は、お使いの端末（ブラウザ）の中だけに残ります。ブラウザの履歴やサイトのデータを消すと、記録も消えます。大事な記録は「保存する」でファイルにしておくと安心です。</li>
+      </ul>
+    </article>
+  </section>
+
+  <!-- 設定 -->
+  <section id="tab-settings" class="tab" hidden>
+    <div class="box">
+      <h2>シートの読み込み</h2>
+      <div class="form">
+        <label for="urlInput">ゆとシートのページのアドレス（URL）</label>
+        <input id="urlInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://yutorize.work/ytsheet/sw2.5/?id=...">
+        <p class="note">閲覧ページでも編集ページでも大丈夫です。</p>
+        <button type="button" id="loadBtn" class="primary">読み込む</button>
+      </div>
+      <div id="loadResult" aria-live="polite"></div>
+      <p id="loadedInfo" class="note"></p>
+    </div>
+
+    <details class="box tool">
+      <summary>うまく読み込めないとき（文章を貼り付けて読み込む）</summary>
+      <div class="form">
+        <p class="note">ゆとシートの編集画面の「アイテム」欄の文章を、そのままコピーして貼り付けてください。マテリアルカードは読み込まれないので、あとから「マテリアルカードを追加」で入れてください。</p>
+        <textarea id="pasteInput" rows="8" spellcheck="false" placeholder="**石類[消耗品]&#10;|~名称|~個数|~効果|~単価|&#10;|魔晶石（５）|3|…"></textarea>
+        <button type="button" id="pasteBtn" class="primary">貼り付けた文章で読み込む</button>
+      </div>
+    </details>
+
+    <div class="box">
+      <h2>保存と読み込み</h2>
+      <p class="note">今の個数や操作ログを、ファイルとして保存できます。別の端末で続きを使いたいときや、念のためのバックアップに使えます。</p>
+      <div class="btn-row">
+        <button type="button" id="exportBtn">保存する</button>
+        <label class="btn" for="importFile">ファイルから読み込む</label>
+        <input id="importFile" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p id="fileResult" class="note" role="status"></p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-foot">
+  <p>このツールは個人が作った<strong>非公式</strong>のもので、<a href="https://yutorize.work/" target="_blank" rel="noopener">ゆとらいず工房</a>の公式サービスではありません。</p>
+  <p>ゆとシートのデータは、公式に案内されているJSON形式の取得機能で読み込んでいます。入力したデータは、この端末の中にだけ保存され、外部へは送信されません。</p>
+  <p>「ソード・ワールド」は、グループSNEおよびKADOKAWAの作品です。 <a href="https://github.com/Rast-Rabbit/sw2.5-consumable-counter" target="_blank" rel="noopener">ソースコード</a></p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
+    <p id="modalMessage"></p>
+    <div class="btn-row">
+      <button type="button" id="modalNo">いいえ</button>
+      <button type="button" id="modalYes" class="danger">はい</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/sheet.js"></script>
+<script src="js/model.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
